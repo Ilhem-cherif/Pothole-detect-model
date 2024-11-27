@@ -1,11 +1,11 @@
 from ultralytics import YOLO
 import cv2
-import numpy as np
-import cvzone
 
-# Load a model
-model = YOLO("best.pt")
+# Load the YOLO model for detection
+model = YOLO("best.pt")  # Ensure "best.pt" is a detection model
 class_names = model.names
+
+# Load the video
 cap = cv2.VideoCapture('p.mp4')
 count = 0
 
@@ -14,33 +14,41 @@ while True:
     if not ret:
         break
     count += 1
+    # Skip frames for faster processing
     if count % 3 != 0:
         continue
-    
+
+    # Resize the image for display purposes (optional)
     img = cv2.resize(img, (1020, 500))
     h, w, _ = img.shape
+
+    # Run detection
     results = model.predict(img)
 
     for r in results:
-        boxes = r.boxes  # Boxes object for bbox outputs
-        masks = r.masks  # Masks object for segment masks outputs
-        
-    if masks is not None:
-        masks = masks.data.cpu()
-        for seg, box in zip(masks.data.cpu().numpy(), boxes):
-            seg = cv2.resize(seg, (w, h))
-            contours, _ = cv2.findContours((seg).astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        boxes = r.boxes  # Boxes object containing the detection results
 
-            for contour in contours:
-                d = int(box.cls)
-                c = class_names[d]
-                x, y,x1,y1 = cv2.boundingRect(contour)
-                cv2.polylines(img, [contour],True, color=(0, 0, 255), thickness=2)
-#                cv2.rectangle(img,(x,y),(x1+x,y1+y),(255,0,0),2)
-                cv2.putText(img, c, (x,y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-                 
-    cv2.imshow('img', img)
-    if cv2.waitKey(0) & 0xFF == ord('q'):
+        # Loop through each detected box
+        for box in boxes:
+            # Get the bounding box coordinates
+            x1, y1, x2, y2 = box.xyxy[0]  # Top-left and bottom-right corners
+            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+
+            # Get the class ID and confidence score
+            class_id = int(box.cls)
+            conf = box.conf[0]  # Confidence score
+            class_name = class_names[class_id]
+
+            # Draw the bounding box
+            cv2.rectangle(img, (x1, y1), (x2, y2), color=(0, 255, 0), thickness=2)
+
+            # Put the class name and confidence score on the bounding box
+            cv2.putText(img, f"{class_name} {conf:.2f}", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+    # Display the video with detections
+    cv2.imshow('Pothole Detection', img)
+    if cv2.waitKey(1) & 0xFF == ord('q'):  # Press 'q' to quit
         break
 
 cap.release()
